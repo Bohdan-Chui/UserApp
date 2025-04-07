@@ -1,0 +1,95 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres
+    restart: always
+    env_file: ./.env
+    environment:
+      POSTGRES_USER: $POSTGRES_USER
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+      POSTGRES_DB: $POSTGRES_DB
+    networks:
+      - app-network
+    ports:
+      - $POSTGRES_INNER_PORT:$POSTGRES_PORT
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3.8-management-alpine
+    container_name: rabbitmq
+    networks:
+      - app-network
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  redis:
+    image: redis
+    networks:
+      - app-network
+    ports:
+      - "6379:6379"
+
+  user-service:
+    build:
+      context: ./user-service
+    container_name: user-service
+    command: npm run start:dev
+    networks:
+      - app-network
+    volumes:
+      - ./user-service:/app
+      - /app/node_modules
+    depends_on:
+      - rabbitmq
+      - postgres
+    ports:
+      - "3000:3000"
+    environment:
+      POSTGRES_HOST: $POSTGRES_HOST
+      POSTGRES_PORT: $POSTGRES_PORT
+      POSTGRES_USER: $POSTGRES_USER
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+      POSTGRES_DB: $POSTGRES_DB
+      RABBITMQ_URL: $RABBITMQ_URL
+
+  scheduler-service:
+    build:
+      context: ./scheduler-service
+    container_name: scheduler-service
+    command: npm run start:dev
+    networks:
+      - app-network
+    volumes:
+      - ./scheduler-service:/app
+      - /app/node_modules
+    depends_on:
+      - rabbitmq
+      - redis
+    environment:
+      RABBITMQ_URL: $RABBITMQ_URL
+      NOTIFICATION_DELAY: $NOTIFICATION_DELAY
+
+  notification-service:
+    build:
+      context: ./notification-service
+    container_name: notification-service
+    command: npm run start:dev
+    networks:
+      - app-network
+    volumes:
+      - ./notification-service:/app
+      - /app/node_modules
+    depends_on:
+      - rabbitmq
+    environment:
+      RABBITMQ_URL: $RABBITMQ_URL
+      WEBHOOK_URL: $WEBHOOK_URL
+
+volumes:
+  pgdata:
+
+networks:
+  app-network:
+    driver: bridge
