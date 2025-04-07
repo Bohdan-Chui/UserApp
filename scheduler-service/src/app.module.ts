@@ -21,7 +21,7 @@ import { SchedulerProcessor } from './scheduler.processor';
         name: 'NOTIFY_SERVICE',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://rabbitmq:5672'],
+          urls: [process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'],
           queue: 'push_events',
           queueOptions: { durable: false },
         },
